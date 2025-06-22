@@ -16,7 +16,17 @@ class CookieManager:
         logger.info("启动浏览器中，第一次启动会比较慢，请使用在浏览器登录")
         with sync_playwright() as p:
             try:
-                browser = p.chromium.launch(headless=False)
+                browser = p.chromium.launch(
+                    headless=False,
+                    args=[
+                        '--no-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-gpu',
+                        '--remote-debugging-port=9222',
+                        '--window-size=1280,720',
+                        '--start-maximized'
+                    ]
+                )
                 page = browser.new_page()
                 page.goto(login_url)
                 page.click(".nav-header-register")
