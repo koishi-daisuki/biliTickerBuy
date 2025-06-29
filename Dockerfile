@@ -51,7 +51,7 @@ priority=300
 startsecs=5
 
 [program:app]
-command=python main.py
+command=python main.py --share
 directory=/app
 environment=DISPLAY=":99"
 autorestart=true
