@@ -12,10 +12,11 @@ from loguru import logger
 from playsound3 import playsound
 from requests import HTTPError, RequestException
 
-from util import ERRNO_DICT, NtfyUtil, PushPlusUtil, ServerChanUtil, time_service
+from util import ERRNO_DICT, NtfyUtil, PushPlusUtil, ServerChanUtil, BarkUtil, time_service
 from util.Notifier import NotifierManager
 from util import bili_ticket_gt_python
 from util.BiliRequest import BiliRequest
+from util.RandomMessages import get_random_fail_message
 
 if bili_ticket_gt_python is not None:
     Amort = importlib.import_module("geetest.TripleValidator").TripleValidator()
@@ -38,10 +39,12 @@ def buy_stream(
     audio_path,
     pushplusToken,
     serverchanKey,
+    barkToken,
     https_proxys,
     ntfy_url=None,
     ntfy_username=None,
     ntfy_password=None,
+    show_random_message=True,
 ):
     if bili_ticket_gt_python is None:
         yield "当前设备不支持本地过验证码，无法使用"
@@ -75,15 +78,15 @@ def buy_stream(
         yield f"时间偏差已被设置为: {timeoffset}s"
         try:
             time_difference = (
-                datetime.strptime(time_start, "%Y-%m-%dT%H:%M:%S").timestamp()
-                - time.time()
-                + timeoffset
+                    datetime.strptime(time_start, "%Y-%m-%dT%H:%M:%S").timestamp()
+                    - time.time()
+                    + timeoffset
             )
         except ValueError:
             time_difference = (
-                datetime.strptime(time_start, "%Y-%m-%dT%H:%M").timestamp()
-                - time.time()
-                + timeoffset
+                    datetime.strptime(time_start, "%Y-%m-%dT%H:%M").timestamp()
+                    - time.time()
+                    + timeoffset
             )
         start_time = time.perf_counter()
         end_time = start_time + time_difference
@@ -195,6 +198,9 @@ def buy_stream(
                     yield f"[尝试 {attempt}/60] 未知异常: {e}"
                     time.sleep(interval / 1000)
             else:
+                if show_random_message:
+                    # 输出群友语录
+                    yield f"群友说👴： {get_random_fail_message()}"
                 yield "重试次数过多，重新准备订单"
                 continue
             if result is None:
@@ -219,6 +225,15 @@ def buy_stream(
                             serverchanKey, "抢票成功", f"前往订单中心付款吧: {detail}"
                         ),
                     )
+
+                if barkToken:
+                    notifierManager.regiseter_notifier(
+                        "BarkNotifier",
+                        BarkUtil.BarkNotifier(
+                            barkToken, "抢票成功", f"前往订单中心付款吧: {detail}"
+                        ),
+                    )
+
                 if ntfy_url:
                     # 使用重复通知功能，每10秒发送一次，持续5分钟
                     NtfyUtil.send_repeat_message(
@@ -269,10 +284,12 @@ def buy(
     audio_path,
     pushplusToken,
     serverchanKey,
+    barkToken,
     https_proxys,
     ntfy_url=None,
     ntfy_username=None,
     ntfy_password=None,
+    show_random_message=True,
 ):
     for msg in buy_stream(
         tickets_info_str,
@@ -283,10 +300,12 @@ def buy(
         audio_path,
         pushplusToken,
         serverchanKey,
+        barkToken,
         https_proxys,
         ntfy_url,
         ntfy_username,
         ntfy_password,
+        show_random_message,
     ):
         logger.info(msg)
 
@@ -302,10 +321,12 @@ def buy_new_terminal(
     audio_path,
     pushplusToken,
     serverchanKey,
+    barkToken,
     https_proxys,
     ntfy_url=None,
     ntfy_username=None,
     ntfy_password=None,
+    show_random_message=True,
     terminal_ui="网页",
 ) -> subprocess.Popen:
     command = [sys.executable]
@@ -328,6 +349,8 @@ def buy_new_terminal(
         command.extend(["--pushplusToken", pushplusToken])
     if serverchanKey:
         command.extend(["--serverchanKey", serverchanKey])
+    if barkToken:
+        command.extend(["--barkToken", barkToken])
     if ntfy_url:
         command.extend(["--ntfy_url", ntfy_url])
     if ntfy_username:
@@ -336,6 +359,8 @@ def buy_new_terminal(
         command.extend(["--ntfy_password", ntfy_password])
     if https_proxys:
         command.extend(["--https_proxys", https_proxys])
+    if not show_random_message:
+        command.extend(["--hide_random_message"])
     if terminal_ui:
         command.extend(["--terminal_ui", terminal_ui])
     command.extend(["--filename", filename])
