@@ -1,6 +1,15 @@
 import argparse
 import os
 
+# 清理系统代理变量以防止 httpx / requests 连接失败
+cleared_vars = []
+for proxy_var in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
+    if proxy_var in os.environ:
+        del os.environ[proxy_var]
+        cleared_vars.append(proxy_var)
+
+if cleared_vars:
+    print(f"[WARN] 已清除以下代理环境变量，避免连接失败: {', '.join(cleared_vars)}")
 
 def get_env_default(key: str, default, cast_func):
     return cast_func(os.environ.get(f"BTB_{key}", default))
@@ -9,7 +18,6 @@ def get_env_default(key: str, default, cast_func):
 def main():
     parser = argparse.ArgumentParser(description="Ticket Purchase Tool or Gradio UI")
     subparsers = parser.add_subparsers(dest="command")
-    # `--buy` 子命令
     buy_parser = subparsers.add_parser("buy", help="Start the ticket buying ui")
     buy_parser.add_argument(
         "tickets_info_str", type=str, help="Ticket information in string format."
@@ -50,6 +58,12 @@ def main():
         help="ServerChan key (optional).",
     )
     buy_parser.add_argument(
+        "--barkToken",
+        type=str,
+        default=os.environ.get("BTB_BARKTOKEN", ""),
+        help="Bark token (optional).",
+    )
+    buy_parser.add_argument(
         "--ntfy_url",
         type=str,
         default=os.environ.get("BTB_NTFY_URL", ""),
@@ -85,8 +99,15 @@ def main():
         default="网页",
         help="server name",
     )
+    buy_parser.add_argument(
+        "--hide_random_message",
+        action="store_true",
+        help="hide random message when fail",
+    )
     # `--worker` 子命令
-    worker_parser = subparsers.add_parser("worker", help="Start the ticket worker ui")  # noqa: F841
+    worker_parser = subparsers.add_parser(
+        "worker", help="Start the ticket worker ui"
+    )  # noqa: F841
     worker_parser.add_argument(
         "--master",
         type=str,

@@ -81,9 +81,11 @@ def buy_cmd(args: Namespace):
         args.audio_path,
         args.pushplusToken,
         args.serverchanKey,
+        args.barkToken,
         args.https_proxys,
         args.ntfy_url,
         args.ntfy_username,
         args.ntfy_password,
+        not args.hide_random_message,
     )
     logger.info("抢票完成后退出程序。。。。。")

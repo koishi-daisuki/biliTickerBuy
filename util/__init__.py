@@ -35,8 +35,15 @@ def get_application_tmp_path() -> str:
     os.makedirs(os.path.join(FILES_ROOT_PATH, "tmp"), exist_ok=True)
     return os.path.join(FILES_ROOT_PATH, "tmp")
 
+def get_exec_path() -> str:
+    if len(sys.argv[0]) > 0 and sys.argv[0].endswith(".py"):    # sometime, argv[0] of `python main.py` is main.py
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    else:
+        return os.path.dirname(os.path.realpath(sys.executable))
 
-EXE_PATH: str = os.path.dirname(os.path.realpath(sys.executable))  # 应用目录
+
+EXE_PATH: str = get_exec_path()  # 应用目录
+
 TEMP_PATH: str = get_application_tmp_path()  # 临时目录
 LOG_DIR: str = os.path.join(EXE_PATH, "btb_logs")
 loguru_config(LOG_DIR, "app.log", enable_console=True, file_colorize=False)
@@ -53,6 +60,8 @@ ERRNO_DICT = {
     100017: "票种不可售",
     100051: "订单准备过期，重新验证",
     100034: "票价错误",
+    900001: "当前拥挤，请稍后再试",
+    900002: "当前拥挤，请稍后再试",
 }
 
 __all__ = [
