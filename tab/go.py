@@ -118,13 +118,15 @@ def go_tab(demo: gr.Blocks):
             type="index",
             value=ways[select_way],
         )
-        with gr.Accordion(label="填写你的HTTPS代理服务器[可选]", open=False):
+        with gr.Accordion(label="填写你的代理服务器[可选]", open=False):
             gr.Markdown("""
                         > **注意**：
 
                         填写代理服务器地址后，程序在使用这个配置文件后会在出现风控后后根据代理服务器去访问哔哩哔哩的抢票接口。
 
                         抢票前请确保代理服务器已经开启，并且可以正常访问哔哩哔哩的抢票接口。
+
+                        支持 HTTP/HTTPS/SOCKS 代理。
 
                         """)
 
@@ -133,7 +135,7 @@ def go_tab(demo: gr.Blocks):
 
             https_proxy_ui = gr.Textbox(
                 label="填写抢票时候的代理服务器地址，使用逗号隔开|输入完成后，回车键保存",
-                info="例如： http://127.0.0.1:8080,http://127.0.0.1:8081,http://127.0.0.1:8082",
+                info="例如： http://127.0.0.1:8080,https://127.0.0.1:8081,socks5://127.0.0.1:1080",
                 value=get_latest_proxy,
             )
 
@@ -343,6 +345,12 @@ def go_tab(demo: gr.Blocks):
             ntfy_password_ui.submit(fn=inner_input_ntfy_password, inputs=ntfy_password_ui, outputs=ntfy_password_ui)
 
             test_bark_button.click(fn=test_bark_push, inputs=[], outputs=test_push_result)
+        with gr.Accordion(label="杂项配置", open=False):
+            show_random_message_ui = gr.Checkbox(
+                label="关闭群友语录",
+                value=True,
+                info="关闭后，抢票失败时将不再显示有趣的语录",
+            )
 
         def choose_option(way):
             nonlocal select_way
@@ -406,14 +414,15 @@ def go_tab(demo: gr.Blocks):
         return assigned_proxies
 
     def start_go(
-            files,
-            time_start,
-            interval,
-            mode,
-            total_attempts,
-            audio_path,
-            https_proxys,
-            terminal_ui,
+        files,
+        time_start,
+        interval,
+        mode,
+        total_attempts,
+        audio_path,
+        https_proxys,
+        terminal_ui,
+        hide_random_message,
     ):
         if not files:
             return [gr.update(value=withTimeString("未提交抢票配置"), visible=True)]
@@ -476,6 +485,7 @@ def go_tab(demo: gr.Blocks):
                     ntfy_password=ConfigDB.get("ntfyPassword"),
                     https_proxys=",".join(assigned_proxies[assigned_proxies_next_idx]),
                     terminal_ui=terminal_ui,
+                    show_random_message=not hide_random_message,
                 )
                 assigned_proxies_next_idx += 1
         gr.Info("正在启动，请等待抢票页面弹出。")
@@ -543,5 +553,6 @@ def go_tab(demo: gr.Blocks):
             audio_path_ui,
             https_proxy_ui,
             terminal_ui,
+            show_random_message_ui,
         ],
     )
