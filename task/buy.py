@@ -9,13 +9,14 @@ from urllib.parse import urlencode
 
 import qrcode
 from loguru import logger
-from playsound3 import playsound
+
 from requests import HTTPError, RequestException
 
-from util import ERRNO_DICT, NtfyUtil, PushPlusUtil, ServerChanUtil, time_service
-from util.Notifier import NotifierManager
+from util import ERRNO_DICT, time_service
+from util.Notifier import NotifierManager, NotifierConfig
 from util import bili_ticket_gt_python
 from util.BiliRequest import BiliRequest
+from util.RandomMessages import get_random_fail_message
 
 if bili_ticket_gt_python is not None:
     Amort = importlib.import_module("geetest.TripleValidator").TripleValidator()
@@ -30,18 +31,14 @@ def get_qrcode_url(_request, order_id) -> str:
 
 
 def buy_stream(
-    tickets_info_str,
-    time_start,
-    interval,
-    mode,
-    total_attempts,
-    audio_path,
-    pushplusToken,
-    serverchanKey,
-    https_proxys,
-    ntfy_url=None,
-    ntfy_username=None,
-    ntfy_password=None,
+        tickets_info_str,
+        time_start,
+        interval,
+        mode,
+        total_attempts,
+        notifier_config,
+        https_proxys,
+        show_random_message=True,
 ):
     if bili_ticket_gt_python is None:
         yield "当前设备不支持本地过验证码，无法使用"
@@ -75,15 +72,15 @@ def buy_stream(
         yield f"时间偏差已被设置为: {timeoffset}s"
         try:
             time_difference = (
-                datetime.strptime(time_start, "%Y-%m-%dT%H:%M:%S").timestamp()
-                - time.time()
-                + timeoffset
+                    datetime.strptime(time_start, "%Y-%m-%dT%H:%M:%S").timestamp()
+                    - time.time()
+                    + timeoffset
             )
         except ValueError:
             time_difference = (
-                datetime.strptime(time_start, "%Y-%m-%dT%H:%M").timestamp()
-                - time.time()
-                + timeoffset
+                    datetime.strptime(time_start, "%Y-%m-%dT%H:%M").timestamp()
+                    - time.time()
+                    + timeoffset
             )
         start_time = time.perf_counter()
         end_time = start_time + time_difference
@@ -195,6 +192,9 @@ def buy_stream(
                     yield f"[尝试 {attempt}/60] 未知异常: {e}"
                     time.sleep(interval / 1000)
             else:
+                if show_random_message:
+                    # 输出群友语录
+                    yield f"群友说👴： {get_random_fail_message()}"
                 yield "重试次数过多，重新准备订单"
                 continue
             if result is None:
@@ -204,33 +204,15 @@ def buy_stream(
 
             request_result, errno = result
             if errno == 0:
-                notifierManager = NotifierManager()
-                if pushplusToken:
-                    notifierManager.regiseter_notifier(
-                        "PushPlusNotifier",
-                        PushPlusUtil.PushPlusNotifier(
-                            pushplusToken, "抢票成功", f"前往订单中心付款吧: {detail}"
-                        ),
-                    )
-                if serverchanKey:
-                    notifierManager.regiseter_notifier(
-                        "ServerChanNotifier",
-                        ServerChanUtil.ServerChanNotifier(
-                            serverchanKey, "抢票成功", f"前往订单中心付款吧: {detail}"
-                        ),
-                    )
-                if ntfy_url:
-                    # 使用重复通知功能，每10秒发送一次，持续5分钟
-                    NtfyUtil.send_repeat_message(
-                        ntfy_url,
-                        f"抢票成功，bilibili会员购，请尽快前往订单中心付款: {detail}",
-                        title="Bili Ticket Payment Reminder",
-                        username=ntfy_username,
-                        password=ntfy_password,
-                        interval_seconds=15,
-                        duration_minutes=5,
-                    )
-                    yield "已启动重复通知，将每15秒发送一次提醒，持续5分钟"
+                # 使用统一的工厂方法创建NotifierManager
+                # 不传递interval_seconds和duration_minutes，让每个推送渠道使用自己的默认值
+                notifierManager = NotifierManager.create_from_config(
+                    config=notifier_config,
+                    title="抢票成功",
+                    content=f"bilibili会员购，请尽快前往订单中心付款: {detail}"
+                )
+                
+                # 启动所有已配置的推送渠道
                 notifierManager.start_all()
 
                 yield "3）抢票成功，弹出付款二维码"
@@ -243,8 +225,6 @@ def buy_stream(
                 qr_gen.make(fit=True)
                 qr_gen_image = qr_gen.make_image()
                 qr_gen_image.show()  # type: ignore
-                if audio_path:
-                    playsound(audio_path)
                 break
             if mode == 1:
                 left_time -= 1
@@ -261,20 +241,6 @@ def buy_stream(
 
 
 def buy(
-    tickets_info_str,
-    time_start,
-    interval,
-    mode,
-    total_attempts,
-    audio_path,
-    pushplusToken,
-    serverchanKey,
-    https_proxys,
-    ntfy_url=None,
-    ntfy_username=None,
-    ntfy_password=None,
-):
-    for msg in buy_stream(
         tickets_info_str,
         time_start,
         interval,
@@ -283,30 +249,58 @@ def buy(
         audio_path,
         pushplusToken,
         serverchanKey,
+        barkToken,
         https_proxys,
-        ntfy_url,
-        ntfy_username,
-        ntfy_password,
+        serverchan3ApiUrl=None,
+        ntfy_url=None,
+        ntfy_username=None,
+        ntfy_password=None,
+        show_random_message=True,
+):
+    # 创建NotifierConfig对象
+    notifier_config = NotifierConfig(
+        serverchan_key=serverchanKey,
+        serverchan3_api_url=serverchan3ApiUrl,
+        pushplus_token=pushplusToken,
+        bark_token=barkToken,
+        ntfy_url=ntfy_url,
+        ntfy_username=ntfy_username,
+        ntfy_password=ntfy_password,
+        audio_path=audio_path
+    )
+    
+    for msg in buy_stream(
+            tickets_info_str,
+            time_start,
+            interval,
+            mode,
+            total_attempts,
+            notifier_config,
+            https_proxys,
+            show_random_message,
     ):
         logger.info(msg)
 
 
 def buy_new_terminal(
-    endpoint_url,
-    filename,
-    tickets_info_str,
-    time_start,
-    interval,
-    mode,
-    total_attempts,
-    audio_path,
-    pushplusToken,
-    serverchanKey,
-    https_proxys,
-    ntfy_url=None,
-    ntfy_username=None,
-    ntfy_password=None,
-    terminal_ui="网页",
+        endpoint_url,
+        filename,
+        tickets_info_str,
+        time_start,
+        interval,
+        mode,
+        total_attempts,
+        audio_path,
+        pushplusToken,
+        serverchanKey,
+        barkToken,
+        https_proxys,
+        serverchan3ApiUrl=None,
+        ntfy_url=None,
+        ntfy_username=None,
+        ntfy_password=None,
+        show_random_message=True,
+        terminal_ui="网页",
 ) -> subprocess.Popen:
     command = [sys.executable]
     if not getattr(sys, "frozen", False):
@@ -328,6 +322,10 @@ def buy_new_terminal(
         command.extend(["--pushplusToken", pushplusToken])
     if serverchanKey:
         command.extend(["--serverchanKey", serverchanKey])
+    if serverchan3ApiUrl:
+        command.extend(["--serverchan3ApiUrl", serverchan3ApiUrl])
+    if barkToken:
+        command.extend(["--barkToken", barkToken])
     if ntfy_url:
         command.extend(["--ntfy_url", ntfy_url])
     if ntfy_username:
@@ -336,6 +334,8 @@ def buy_new_terminal(
         command.extend(["--ntfy_password", ntfy_password])
     if https_proxys:
         command.extend(["--https_proxys", https_proxys])
+    if not show_random_message:
+        command.extend(["--hide_random_message"])
     if terminal_ui:
         command.extend(["--terminal_ui", terminal_ui])
     command.extend(["--filename", filename])

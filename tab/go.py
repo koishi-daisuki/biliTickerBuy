@@ -118,13 +118,15 @@ def go_tab(demo: gr.Blocks):
             type="index",
             value=ways[select_way],
         )
-        with gr.Accordion(label="填写你的HTTPS代理服务器[可选]", open=False):
+        with gr.Accordion(label="填写你的代理服务器[可选]", open=False):
             gr.Markdown("""
                         > **注意**：
 
                         填写代理服务器地址后，程序在使用这个配置文件后会在出现风控后后根据代理服务器去访问哔哩哔哩的抢票接口。
 
                         抢票前请确保代理服务器已经开启，并且可以正常访问哔哩哔哩的抢票接口。
+
+                        支持 HTTP/HTTPS/SOCKS 代理。
 
                         """)
 
@@ -133,8 +135,8 @@ def go_tab(demo: gr.Blocks):
 
             https_proxy_ui = gr.Textbox(
                 label="填写抢票时候的代理服务器地址，使用逗号隔开|输入完成后，回车键保存",
-                info="例如： http://127.0.0.1:8080,http://127.0.0.1:8081,http://127.0.0.1:8082",
-                value=get_latest_proxy,
+                info="例如： http://127.0.0.1:8080,https://127.0.0.1:8081,socks5://127.0.0.1:1080",
+                value=(ConfigDB.get("https_proxy") or ""),
             )
 
             def input_https_proxy(_https_proxy):
@@ -182,62 +184,81 @@ def go_tab(demo: gr.Blocks):
         with gr.Accordion(label="配置抢票成功后播放音乐[可选]", open=False):
             with gr.Row():
                 audio_path_ui = gr.Audio(
-                    label="上传提示声音[只支持格式wav]", type="filepath", loop=True
+                    label="上传提示声音[只支持格式wav]", type="filepath", loop=True,
+                    value=(ConfigDB.get("audioPath") or None)
                 )
         with gr.Accordion(label="配置抢票推送消息[可选]", open=False):
             gr.Markdown(
-            """
-            🗨️ **抢票成功提醒**
-
-            > 你需要去对应的网站获取 key 或 token，然后填入下面的输入框  
-            > [Server酱](https://sct.ftqq.com/sendkey) | [pushplus](https://www.pushplus.plus/uc.html) | [ntfy](https://ntfy.sh/)  
-            > 留空以不启用提醒功能
-
-            ### 🔍 推送服务对比
-
-            | 服务     | 优点                               | 缺点                            |
-            |----------|------------------------------------|---------------------------------|
-            | Server酱 | 简单易用，微信推送              | 微信推送很难看到 |
-            | pushplus | 简单易用，微信推送| 微信推送很难看到               |
-            | ntfy     | APP推送 | 配置复杂，需要手动搭建或注册公网地址 |
-
-            ✅ 推荐：初次使用建议选择 **pushplus** 或 **Server酱**，配置最简单  
-            🛠️ 追求高度自由或有自建服务器建议用 **ntfy**
-            """
-            )   
+                """
+                🗨️ **抢票成功提醒**
+    
+                > 你需要去对应的网站获取 key 或 token，然后填入下面的输入框  
+                > [Server酱<sup>Turbo</sup>](https://sct.ftqq.com/sendkey) | [pushplus](https://www.pushplus.plus/uc.html) | [Server酱<sup>3</sup>](https://sc3.ft07.com/sendkey) | [ntfy](https://ntfy.sh/) | [Bark](https://bark.day.app/)  
+                > 留空以不启用提醒功能
+    
+                ### 🔍 推送服务对比
+    
+                | 服务     | 优点                               | 缺点                            |
+                |----------|------------------------------------|---------------------------------|
+                | Server酱<sup>Turbo</sup> | 简单易用，微信推送              | 微信推送很难看到 |
+                | pushplus | 简单易用，微信推送| 微信推送很难看到               |
+                | Server酱<sup>3</sup> | APP推送，有中文文档              | 配置复杂 |
+                | ntfy     | APP推送, 功能强大, 支持长期响铃 | 配置复杂，需要手动搭建或注册公网地址 |
+                | Bark     | iOS通知推送，配置简单，无视静音和勿扰模式，支持APP跳转 | 仅支持iOS设备 |
+    
+                ✅ 推荐：初次使用建议选择 **pushplus** 或 **Server酱ᵀᵘʳᵇᵒ**，配置最简单  
+                🍎 iOS用户推荐使用 **Bark**，通知效果最佳  
+                🛠️ 追求高度自由/有自建服务器/需要在抢票成功时通过手机播放铃声时，建议用 **ntfy** 或 **Server酱³**
+                """
+            )
             with gr.Row():
                 serverchan_ui = gr.Textbox(
-                    value= lambda : (ConfigDB.get("serverchanKey") or ""),
-                    label="Server酱的SendKey｜输入完成后，回车键保存",
+                    value=(ConfigDB.get("serverchanKey") or ""),
+                    label="Server酱ᵀᵘʳᵇᵒ的SendKey｜输入完成后，回车键保存",
                     interactive=True,
                     info="https://sct.ftqq.com/",
                 )
 
+                serverchan3_ui = gr.Textbox(
+                    value=(ConfigDB.get("serverchan3ApiUrl") or ""),
+                    label="Server酱³的API URL｜输入完成后，回车键保存",
+                    interactive=True,
+                    info="https://sc3.ft07.com/",
+                )
+
                 pushplus_ui = gr.Textbox(
-                    value=lambda :(ConfigDB.get("pushplusToken") or ''),
+                    value=(ConfigDB.get("pushplusToken") or ''),
                     label="PushPlus的Token｜输入完成后，回车键保存",
                     interactive=True,
                     info="https://www.pushplus.plus/",
                 )
 
+                bark_ui = gr.Textbox(
+                    value=(ConfigDB.get("barkToken") or ""),
+                    label="Bark的Token｜输入完成后，回车键保存",
+                    interactive=True,
+                    info='iOS Bark App的"服务器"页面获取，例如: jmGYK*****(并非Device Token)；自托管服务请输入完整推送地址，例如: https://bark.example.app/jmGYK*****',
+                )
+
+            with gr.Accordion(label="Ntfy配置", open=False):
                 ntfy_ui = gr.Textbox(
-                    value=lambda :(ConfigDB.get("ntfyUrl") or ""),
+                    value=(ConfigDB.get("ntfyUrl") or ""),
                     label="Ntfy服务器URL｜输入完成后，回车键保存",
                     interactive=True,
                     info="例如: https://ntfy.sh/your-topic",
                 )
-
-            with gr.Accordion(label="Ntfy认证配置[可选]", open=False):
+                
+                with gr.Accordion(label="Ntfy认证配置[可选]", open=False):
                     with gr.Row():
                         ntfy_username_ui = gr.Textbox(
-                            value=lambda :(ConfigDB.get("ntfyUsername") or ""),
+                            value=(ConfigDB.get("ntfyUsername") or ""),
                             label="Ntfy用户名",
                             interactive=True,
                             info="如果你的Ntfy服务器需要认证",
                         )
 
                         ntfy_password_ui = gr.Textbox(
-                            value=lambda :(ConfigDB.get("ntfyPassword") or ""),
+                            value=(ConfigDB.get("ntfyPassword") or ""),
                             label="Ntfy密码",
                             interactive=True,
                             type="password",
@@ -268,13 +289,26 @@ def go_tab(demo: gr.Blocks):
                         fn=test_ntfy_connection, inputs=[], outputs=test_ntfy_result
                     )
 
+            # 推送测试按钮区域
+            with gr.Row():
+                test_all_push_button = gr.Button("🧪 测试所有推送")
+                test_push_result = gr.Textbox(label="推送测试结果", interactive=False)
+
             def inner_input_serverchan(x):
                 ConfigDB.insert("serverchanKey", x)
                 return gr.update(value=ConfigDB.get("serverchanKey"))
 
+            def inner_input_serverchan3(x):
+                ConfigDB.insert("serverchan3ApiUrl", x)
+                return gr.update(value=ConfigDB.get("serverchan3ApiUrl"))
+
             def inner_input_pushplus(x):
                 ConfigDB.insert("pushplusToken", x)
                 return gr.update(value=ConfigDB.get("pushplusToken"))
+
+            def inner_input_bark(x):
+                ConfigDB.insert("barkToken", x)
+                return gr.update(value=ConfigDB.get("barkToken"))
 
             def inner_input_ntfy(x):
                 ConfigDB.insert("ntfyUrl", x)
@@ -288,9 +322,26 @@ def go_tab(demo: gr.Blocks):
                 ConfigDB.insert("ntfyPassword", x)
                 return gr.update(value=ConfigDB.get("ntfyPassword"))
 
+            def inner_input_audio_path(x):
+                ConfigDB.insert("audioPath", x)
+                return gr.update(value=ConfigDB.get("audioPath"))
+
+            def test_all_push():
+                """调用NotifierManager统一测试所有推送渠道"""
+                try:
+                    from util.Notifier import NotifierManager
+                    return NotifierManager.test_all_notifiers()
+                except Exception as e:
+                    logger.exception(e)
+                    return f"错误: 测试过程中发生异常 - {str(e)}"
+
             serverchan_ui.submit(fn=inner_input_serverchan, inputs=serverchan_ui, outputs=serverchan_ui)
 
+            serverchan3_ui.submit(fn=inner_input_serverchan3, inputs=serverchan3_ui, outputs=serverchan3_ui)
+
             pushplus_ui.submit(fn=inner_input_pushplus, inputs=pushplus_ui, outputs=pushplus_ui)
+
+            bark_ui.submit(fn=inner_input_bark, inputs=bark_ui, outputs=bark_ui)
 
             ntfy_ui.submit(fn=inner_input_ntfy, inputs=ntfy_ui, outputs=ntfy_ui)
 
@@ -298,6 +349,15 @@ def go_tab(demo: gr.Blocks):
 
             ntfy_password_ui.submit(fn=inner_input_ntfy_password, inputs=ntfy_password_ui, outputs=ntfy_password_ui)
 
+            test_all_push_button.click(fn=test_all_push, inputs=[], outputs=test_push_result)
+
+            audio_path_ui.upload(fn=inner_input_audio_path, inputs=audio_path_ui, outputs=audio_path_ui)
+        with gr.Accordion(label="杂项配置", open=False):
+            show_random_message_ui = gr.Checkbox(
+                label="关闭群友语录",
+                value=True,
+                info="关闭后，抢票失败时将不再显示有趣的语录",
+            )
 
         def choose_option(way):
             nonlocal select_way
@@ -369,6 +429,7 @@ def go_tab(demo: gr.Blocks):
         audio_path,
         https_proxys,
         terminal_ui,
+        hide_random_message,
     ):
         if not files:
             return [gr.update(value=withTimeString("未提交抢票配置"), visible=True)]
@@ -399,6 +460,8 @@ def go_tab(demo: gr.Blocks):
                         "audio_path": audio_path,
                         "pushplusToken": ConfigDB.get("pushplusToken"),
                         "serverchanKey": ConfigDB.get("serverchanKey"),
+                        "serverchan3ApiUrl": ConfigDB.get("serverchan3ApiUrl"),
+                        "barkToken": ConfigDB.get("barkToken"),
                         "ntfy_url": ConfigDB.get("ntfyUrl"),
                         "ntfy_username": ConfigDB.get("ntfyUsername"),
                         "ntfy_password": ConfigDB.get("ntfyPassword"),
@@ -424,11 +487,14 @@ def go_tab(demo: gr.Blocks):
                     audio_path=audio_path,
                     pushplusToken=ConfigDB.get("pushplusToken"),
                     serverchanKey=ConfigDB.get("serverchanKey"),
+                    serverchan3ApiUrl=ConfigDB.get("serverchan3ApiUrl"),
+                    barkToken=ConfigDB.get("barkToken"),
                     ntfy_url=ConfigDB.get("ntfyUrl"),
                     ntfy_username=ConfigDB.get("ntfyUsername"),
                     ntfy_password=ConfigDB.get("ntfyPassword"),
                     https_proxys=",".join(assigned_proxies[assigned_proxies_next_idx]),
                     terminal_ui=terminal_ui,
+                    show_random_message=not hide_random_message,
                 )
                 assigned_proxies_next_idx += 1
         gr.Info("正在启动，请等待抢票页面弹出。")
@@ -496,5 +562,6 @@ def go_tab(demo: gr.Blocks):
             audio_path_ui,
             https_proxy_ui,
             terminal_ui,
+            show_random_message_ui,
         ],
     )
