@@ -5,9 +5,11 @@ import sys
 import time
 from datetime import datetime
 from json import JSONDecodeError
+from urllib import request
 from urllib.parse import urlencode
 
 import qrcode
+from requests.adapters import ProxyError,SSLError,ConnectionError
 from loguru import logger
 
 from requests import HTTPError, RequestException
@@ -184,12 +186,32 @@ def buy_stream(
 
                     time.sleep(interval / 1000)
 
-                except RequestException as e:
-                    yield f"[尝试 {attempt}/60] 请求异常: {e}"
+                except ProxyError as e:
+                    logger.exception(e)
+                    _request.switch_proxy()
+                    yield f"[尝试 {attempt}/60] 代理连接错误: {e},尝试更换代理到{_request.proxy_list[_request.now_proxy_idx]}"
                     time.sleep(interval / 1000)
-
+                except SSLError as e:
+                    logger.exception(e)
+                    _request.switch_proxy()
+                    yield f"[尝试 {attempt}/60] SSL连接错误: {e},尝试更换代理到{_request.proxy_list[_request.now_proxy_idx]}"
+                    time.sleep(interval / 1000)
+                except ConnectionError as e:
+                    logger.exception(e)
+                    _request.switch_proxy()
+                    yield f"[尝试 {attempt}/60] 网络连接错误: {e},尝试更换代理到{_request.proxy_list[_request.now_proxy_idx]} "
+                    time.sleep(interval / 1000)
+                except RequestException as e:
+                    logger.exception(e)
+                    if code != 429:
+                        _request.switch_proxy()
+                        yield f"[尝试 {attempt}/60] 请求异常: {e},尝试更换代理到{_request.proxy_list[_request.now_proxy_idx]}"
+                    else:
+                        yield f"[尝试 {attempt}/60] 请求过于频繁，重试中: {e}"
+                    time.sleep(interval / 1000)
                 except Exception as e:
                     yield f"[尝试 {attempt}/60] 未知异常: {e}"
+                    _request.switch_proxy()
                     time.sleep(interval / 1000)
             else:
                 if show_random_message:
@@ -235,6 +257,7 @@ def buy_stream(
         except HTTPError as e:
             logger.exception(e)
             yield f"请求错误: {e}"
+       
         except Exception as e:
             logger.exception(e)
             yield f"程序异常: {repr(e)}"
